@@ -1,5 +1,6 @@
 import collections
 import datetime
+from .signal import WindowedStep
 
 # The control panel consumes about 2.8W.
 #
@@ -17,35 +18,29 @@ import datetime
 # For any transition, to prevent flapping and smooth blips that happen
 # just after a transition, we disallow another transition for
 # WINDOW_DUR (longer would also be safe).
+OFF_MAX_WATTS = 5               # Instantaneous
 WINDOW_DUR = datetime.timedelta(seconds=60)
-RUNNING_WATTS = 20              # Max over window
-OFF_WATTS = 5                   # Instantaneous
+ON_MIN_WATTS = 20               # Max over windowed
 
 class WasherMonitor:
     def __init__(self):
-        self.state = "off"
+        self.state = "off"      # "on", "off"
         self.__transition_time = None
-        self.__power = collections.deque()
+        self.__power = WindowedStep(WINDOW_DUR)
 
     def update_power(self, time, watts):
         # TODO: Schedule a future state change so we don't depend on
         # polling.
 
-        # Update window.
-        self.__power.append((time, watts))
-        expire = time - WINDOW_DUR
-        while len(self.__power) > 0 and self.__power[0][0] <= expire:
-            self.__power.popleft()
-        recent_max = max(p[1] for p in self.__power)
+        self.__power.update(time, watts)
 
         # Update state.
-        prevState = self.state
+        state = self.state
         if self.__transition_time == None or time - self.__transition_time >= WINDOW_DUR:
-            if self.state == "off" and recent_max >= RUNNING_WATTS:
-                self.state = "on"
-            if self.state == "on" and watts < OFF_WATTS:
-                self.state = "off"
-        if self.state != prevState:
+            if state == "off" and self.__power.max() >= ON_MIN_WATTS:
+                state = "on"
+            if state == "on" and watts < OFF_MAX_WATTS:
+                state = "off"
+        if state != self.state:
+            self.state = state
             self.__transition_time = time
-
-        return recent_max

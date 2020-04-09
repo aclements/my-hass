@@ -4,8 +4,8 @@ import csv
 import sys
 import datetime
 
-#mon = WasherMonitor()
-mon = DryerMonitor()
+mon = WasherMonitor()
+#mon = DryerMonitor()
 for rec in csv.reader(sys.stdin):
     if rec[1] == "unavailable":
         continue
