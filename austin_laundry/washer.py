@@ -24,7 +24,8 @@ ON_MIN_WATTS = 20               # Max over windowed
 
 class WasherMonitor:
     def __init__(self):
-        self.state = "off"      # "on", "off"
+        self.state = "off"      # "on", "done", "off"
+        self.__pstate = "off"   # "on", "off"
         self.__transition_time = None
         self.__power = WindowedStep(WINDOW_DUR)
 
@@ -34,13 +35,27 @@ class WasherMonitor:
 
         self.__power.update(time, watts)
 
-        # Update state.
-        state = self.state
+        # Update power state.
+        pstate = self.__pstate
         if self.__transition_time == None or time - self.__transition_time >= WINDOW_DUR:
-            if state == "off" and self.__power.max() >= ON_MIN_WATTS:
-                state = "on"
-            if state == "on" and watts < OFF_MAX_WATTS:
-                state = "off"
-        if state != self.state:
-            self.state = state
+            if pstate == "off" and self.__power.max() >= ON_MIN_WATTS:
+                pstate = "on"
+            if pstate == "on" and watts < OFF_MAX_WATTS:
+                pstate = "off"
+        if pstate != self.__pstate:
+            self.__pstate = pstate
             self.__transition_time = time
+
+        # Use power state to transition overall state.
+        if self.state == "on" and pstate == "off":
+            # Washer finished; clothes are ready.
+            self.state = "done"
+        elif self.state == "done" and pstate == "off":
+            # Clothes remain ready.
+            pass
+        else:
+            self.state = pstate
+
+    def door_opened(self):
+        if self.state == "done":
+            self.state = "off"

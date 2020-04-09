@@ -11,13 +11,19 @@ DOMAIN = "austin_laundry"
 
 WASHER_ENTITY = "sensor.zooz_zen15_power_switch_power"
 DRYER_ENTITY = "sensor.zooz_zen15_power_switch_power_2"
+WASHER_DOOR_ENTITY = "binary_sensor.sensative_strips_sensor"
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass, config):
     _LOGGER.debug("registering austin_laundry")
 
-    plumb_state(hass, WASHER_ENTITY, "washer", WasherMonitor())
+    washer = WasherMonitor()
+    plumb_state(hass, WASHER_ENTITY, "washer", washer)
+    async def async_door_opened(entity_id, old_state, new_state):
+        washer.door_opened()
+    event.async_track_state_change(hass, WASHER_DOOR_ENTITY, async_door_opened, "on", "off")
+
     plumb_state(hass, DRYER_ENTITY, "dryer", DryerMonitor())
 
     # Return boolean to indicate that initialization was successful.
