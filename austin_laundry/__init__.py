@@ -22,7 +22,8 @@ async def async_setup(hass, config):
     plumb_state(hass, WASHER_ENTITY, "washer", washer)
     async def async_door_opened(entity_id, old_state, new_state):
         washer.door_opened()
-    event.async_track_state_change(hass, WASHER_DOOR_ENTITY, async_door_opened, "on", "off")
+    # The washer door is "off" when closed and "on" when open.
+    event.async_track_state_change(hass, WASHER_DOOR_ENTITY, async_door_opened, "off", "on")
 
     plumb_state(hass, DRYER_ENTITY, "dryer", DryerMonitor())
 
