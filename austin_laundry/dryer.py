@@ -17,9 +17,10 @@ from .signal import WindowedStep
 # ~200W for a few seconds, and goes idle again. To smooth this out, we
 # apply windowing.
 #
-# When coming down from a high-wattage state, it will sometimes
-# briefly drop below the door-open threshold, so we apply windowing to
-# this, too.
+# When transitioning between off and a high-wattage state (either when
+# finishing a load, or when starting or finishing a wrinkle protect),
+# it can transiently appear to be in the door-open range. Hence, we
+# require the whole window to be within the door-open range.
 
 OFF_MAX_WATTS = 8                           # Instantaneous
 WINDOW_DUR = datetime.timedelta(seconds=10)
@@ -54,10 +55,10 @@ class DryerMonitor:
             # dryer coming on, but that's the only way to filter out
             # wrinkle protect.
             pstate = "on"
-        elif self.__power.max() < DOOR_MAX_WATTS:
-            # This will respond immediately to the door opening. The
-            # windowed max filters out if we're just coming down from
-            # a high-wattage state.
+        elif self.__power.min() > OFF_MAX_WATTS and self.__power.max() < DOOR_MAX_WATTS:
+            # We require the whole window to be in the door-open range
+            # to filter out transitions between off and high-wattage
+            # states.
             pstate = "door"
         self.__pstate = pstate
 

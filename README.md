@@ -163,5 +163,8 @@ There is some sample data in the root of this repository:
   "wrinkle protect" after the load is done as well as unloading the
   clothes (which does appear in the power profile).
 - washer-2.csv: Two washer loads.
-- dryer-2.csv: Two dryer loads. No wrinkle protect. Clothes were left
-  in for a while.
+- dryer-2.csv: Two dryer loads. No wrinkle protect. Door was briefly
+  opened during the first load. Clothes were left in for a while.
+- dryer-3.csv: One dryer load with wrinkle protect. Door was briefly
+  opened in the middle of the cycle. Shows a transient low power
+  during wrinkle protect.
