@@ -168,3 +168,6 @@ There is some sample data in the root of this repository:
 - dryer-3.csv: One dryer load with wrinkle protect. Door was briefly
   opened in the middle of the cycle. Shows a transient low power
   during wrinkle protect.
+
+To run the unit tests that check the signal processing of these sample
+files, run `python3 -m unittest` from the root of the repo.
