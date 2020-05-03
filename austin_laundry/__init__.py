@@ -32,24 +32,42 @@ async def async_setup(hass, config):
 
 def plumb_state(hass, entity_id, typ, monitor):
     prev_state = None
-    async def async_change(entity_id, old_state, new_state):
-        nonlocal prev_state
-        _LOGGER.debug("%s power changed %s", typ, new_state)
-        power = try_float(new_state.state)
-        if new_state.state == const.STATE_UNAVAILABLE:
-            state = const.STATE_UNAVAILABLE
-        elif power == None:
-            _LOGGER.warn("bad %s power %s", typ, new_state.state)
-            state = const.STATE_PROBLEM
-        else:
-            monitor.update(datetime.datetime.now(), power)
-            state = monitor.state
+    reset_time_tracker = None
+    def update(power):
+        nonlocal prev_state, reset_time_tracker
 
+        next_update = monitor.update(datetime.datetime.now(), power)
+
+        if reset_time_tracker != None:
+            reset_time_tracker()
+            reset_time_tracker = None
+        if next_update != None:
+            next_update = event.async_track_point_in_time(hass, async_time)
+
+        return monitor.state
+
+    def set_state(state):
+        nonlocal prev_state
         if state != prev_state:
             _LOGGER.debug("new %s state %s", typ, monitor.state)
             hass.states.async_set(
-                "austin_laundry."+typ, monitor.state)
-            prev_state = monitor.state
+                "austin_laundry."+typ, state)
+            prev_state = state
+
+    async def async_time(time):
+        set_state(update(None))
+
+    async def async_change(entity_id, old_state, new_state):
+        #_LOGGER.debug("%s power changed %s", typ, new_state)
+        power = try_float(new_state.state)
+        if new_state.state == const.STATE_UNAVAILABLE:
+            set_state(const.STATE_UNAVAILABLE)
+        elif power == None:
+            _LOGGER.warn("bad %s power %s", typ, new_state.state)
+            set_state(const.STATE_PROBLEM)
+        else:
+            set_state(update(power))
+
     event.async_track_state_change(hass, entity_id, async_change)
 
 def try_float(s):
