@@ -14,7 +14,7 @@ from .signal import WindowedStep
 #
 # When in wrinkle protect, it's mostly idle (~1.5W), except every 5
 # minutes when it spikes up to ~1500–2000W for a second, stays at
-# ~200W for a few seconds, and goes idle again. To smooth this out, we
+# ~200W for 10 seconds, and goes idle again. To smooth this out, we
 # apply windowing.
 #
 # When transitioning between off and a high-wattage state (either when
@@ -23,7 +23,7 @@ from .signal import WindowedStep
 # require the whole window to be within the door-open range.
 
 OFF_MAX_WATTS = 8                           # Instantaneous
-WINDOW_DUR = datetime.timedelta(seconds=10)
+WINDOW_DUR = datetime.timedelta(seconds=15)
 DOOR_MAX_WATTS = 15                         # Windowed
 ON_MIN_WATTS = 150                          # Windowed
 
@@ -33,33 +33,11 @@ class DryerMonitor:
         self.__pstate = "off"   # "on", "off", or "door"
         self.__power = WindowedStep(WINDOW_DUR)
 
-    def update_power(self, time, watts):
-        # TODO: Schedule a future state change so we don't depend on
-        # polling. Maybe this should be part of WindowedStep? The
-        # simplest thing would be to query it for "when is the time of
-        # next change assuming there are no more updates?" and if I
-        # want to get fancy I could pass in the computation and ask
-        # "when will the value of this computation change if there are
-        # no more updates?"
-
+    def update(self, time, watts=None):
         self.__power.update(time, watts)
 
         # Compute power state.
-        pstate = self.__pstate
-        if watts < OFF_MAX_WATTS:
-            # It never has a transient drop this low, so we can
-            # immediately consider it off.
-            pstate = "off"
-        elif self.__power.min() >= ON_MIN_WATTS:
-            # This means it will take WINDOW_DUR to respond to the
-            # dryer coming on, but that's the only way to filter out
-            # wrinkle protect.
-            pstate = "on"
-        elif self.__power.min() > OFF_MAX_WATTS and self.__power.max() < DOOR_MAX_WATTS:
-            # We require the whole window to be in the door-open range
-            # to filter out transitions between off and high-wattage
-            # states.
-            pstate = "door"
+        pstate, next_time = self.__power.process(self.__compute_pstate)
         self.__pstate = pstate
 
         # Use power state to transition dryer state.
@@ -74,3 +52,23 @@ class DryerMonitor:
             self.state = "off"
         else:
             self.state = pstate
+
+        return next_time
+
+    def __compute_pstate(self, power):
+        if power.current() < OFF_MAX_WATTS:
+            # It never has a transient drop this low, so we can
+            # immediately consider it off.
+            return "off"
+        if power.min() >= ON_MIN_WATTS:
+            # This means it will take WINDOW_DUR to respond to the
+            # dryer coming on, but that's the only way to filter out
+            # wrinkle protect.
+            return "on"
+        if power.min() > OFF_MAX_WATTS and power.max() < DOOR_MAX_WATTS:
+            # We require the whole window to be in the door-open range
+            # to filter out transitions between off and high-wattage
+            # states.
+            return "door"
+        # No change.
+        return self.__pstate

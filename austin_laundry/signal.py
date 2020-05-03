@@ -27,9 +27,48 @@ class WindowedStep:
         if value != None:
             self.__q.append((time, value))
 
+    def process(self, cb):
+        """Process this signal using cb(sig).
+
+        This applies cb to this signal and returns a pair of its
+        result and the earliest time at which the result of cb will
+        change if there are no more updates to the signal.
+
+        cb must be pure, since this will call it with several
+        hypothetical signals.
+        """
+
+        # Get the current value.
+        now = self.__q[len(self.__q)-1][0]
+        val = cb(wsView(self.__q, now))
+
+        # Step forward in time, simulating the situation where there
+        # are no more updates.
+        q2 = self.__q.copy()
+        q2.popleft()
+        while len(q2) > 0:
+            then = q2[0][0] + self.__dur
+            if cb(wsView(q2, then)) != val:
+                # The processed value changed at this point.
+                return val, then
+            q2.popleft()
+
+        # cb will never change until there are further updates.
+        return val, None
+
+class wsView:
+    def __init__(self, q, now):
+        self.__q = q
+        self.__now = now
+
+    def time(self):
+        return self.__now
+
+    def current(self):
+        return self.__q[len(self.__q)-1][1]
+
     def min(self):
         return min(x[1] for x in self.__q)
 
     def max(self):
         return max(x[1] for x in self.__q)
-    

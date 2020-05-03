@@ -29,32 +29,46 @@ class WasherMonitor:
         self.__transition_time = None
         self.__power = WindowedStep(WINDOW_DUR)
 
-    def update_power(self, time, watts):
-        # TODO: Schedule a future state change so we don't depend on
-        # polling.
-
+    def update(self, time, watts=None):
         self.__power.update(time, watts)
 
         # Update power state.
-        pstate = self.__pstate
-        if self.__transition_time == None or time - self.__transition_time >= WINDOW_DUR:
-            if pstate == "off" and self.__power.max() >= ON_MIN_WATTS:
-                pstate = "on"
-            if pstate == "on" and watts < OFF_MAX_WATTS:
-                pstate = "off"
+        pstate, next_time = self.__power.process(self.__compute_pstate)
         if pstate != self.__pstate:
-            self.__pstate = pstate
-            self.__transition_time = time
+            # Apply hysteresis.
+            if self.__transition_time == None or time - self.__transition_time >= WINDOW_DUR:
+                self.__pstate = pstate
+                self.__transition_time = time
+            else:
+                end_t = self.__transition_time + WINDOW_DUR
+                if next_time == None:
+                    next_time = end_t
+                else:
+                    next_time = min(next_time, end_t)
 
         # Use power state to transition overall state.
-        if self.state == "on" and pstate == "off":
+        if self.state == "on" and self.__pstate == "off":
             # Washer finished; clothes are ready.
             self.state = "done"
-        elif self.state == "done" and pstate == "off":
+        elif self.state == "done" and self.__pstate == "off":
             # Clothes remain ready.
             pass
         else:
-            self.state = pstate
+            self.state = self.__pstate
+
+        return next_time
+
+    def __compute_pstate(self, power):
+        # TODO: The reads of __pstate here are wrong in a sense
+        # because they read the current power state, but as we
+        # simulate forward that could change. Really this should be a
+        # derived signal.
+        if self.__pstate == "off" and power.max() >= ON_MIN_WATTS:
+            return "on"
+        if self.__pstate == "on" and power.current() < OFF_MAX_WATTS:
+            return "off"
+        # No change.
+        return self.__pstate
 
     def door_opened(self):
         if self.state == "done":

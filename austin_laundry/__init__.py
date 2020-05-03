@@ -42,7 +42,7 @@ def plumb_state(hass, entity_id, typ, monitor):
             _LOGGER.warn("bad %s power %s", typ, new_state.state)
             state = const.STATE_PROBLEM
         else:
-            monitor.update_power(datetime.datetime.now(), power)
+            monitor.update(datetime.datetime.now(), power)
             state = monitor.state
 
         if state != prev_state:
