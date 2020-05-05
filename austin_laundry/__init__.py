@@ -42,7 +42,7 @@ def plumb_state(hass, entity_id, typ, monitor):
             reset_time_tracker()
             reset_time_tracker = None
         if next_update != None:
-            next_update = event.async_track_point_in_time(hass, async_time)
+            reset_time_tracker = event.async_track_point_in_time(hass, async_time, next_update)
 
         return monitor.state
 
